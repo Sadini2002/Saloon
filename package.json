@@ -2,10 +2,14 @@
   "name": "saloon",
   "version": "0.1.0",
   "private": true,
+  
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    
+  "type": "module"
+
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
