@@ -1,48 +1,53 @@
+// script to seed the database with initial data
 
+import { PrismaClient, Prisma } from "../app/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import "dotenv/config";
 
-//script to seed the database with initial data
-import { PrismaClient } from "@prisma/client";
-import { prisma } from "../lib/prisma";
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+});
 
+const prisma = new PrismaClient({
+  adapter,
+});
+
+const userData: Prisma.UserCreateInput[] = [
+  {
+    email: "admin@gmail.com",
+    firstName: "Admin",
+    lastname: "User",
+    password: "admin123",
+    role: "ADMIN",
+    status: "ACTIVE",
+    privileges: '["CREATE_USER", "DELETE_USER", "UPDATE_USER"]',
+  },
+  {
+    email: "user@gmail.com",
+    firstName: "John",
+    lastname: "Doe",
+    password: "user123",
+    role: "USER",
+    status: "ACTIVE",
+    privileges: '["READ_POST", "CREATE_COMMENT"]',
+  },
+];
 
 async function main() {
-  // Create a new user with a post
-  const user = await prisma.user.create({
-    data: {
-      name: "Alice",
-      email: "alice@prisma.io",
-      posts: {
-        create: {
-          title: "Hello World",
-          content: "This is my first post!",
-          published: true,
-        },
-      },
-    },
-    include: {
-      posts: true,
-    },
-  });
-  console.log("Created user:", user);
-}
+  for (const user of userData) {
+    await prisma.user.create({
+      data: user,
+    });
+  }
 
-  // Fetch all users with their posts
- /* const allUsers = await prisma.user.findMany({
-    include: {
-      posts: true,
-    },
-  });
-  console.log("All users:", JSON.stringify(allUsers, null, 2));
+  console.log("Users created successfully!");
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
+  .catch((error) => {
+    console.error(error);
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });
-*/
