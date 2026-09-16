@@ -1,4 +1,10 @@
-import { prisma } from "./lib/prisma";
+
+
+//script to seed the database with initial data
+import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
+const prisma = new PrismaClient();
+
 
 async function main() {
   // Create a new user with a post
@@ -19,9 +25,10 @@ async function main() {
     },
   });
   console.log("Created user:", user);
+}
 
   // Fetch all users with their posts
-  const allUsers = await prisma.user.findMany({
+ /* const allUsers = await prisma.user.findMany({
     include: {
       posts: true,
     },
@@ -38,3 +45,4 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+*/

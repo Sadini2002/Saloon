@@ -8,18 +8,18 @@ datasource db {
 }
 
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  posts Post[]
-}
+  id String @id @default(uuid())
+  email String @unique
+  phone String? @unique
+  firstName String
+  lastname String
+  password String 
+  role String @default("CUSTOMER")
+  status String @default("ACTIVE")//actie, banned and suspended
+  createdAt DateTime @default(now())
+  lastLogin DateTime? @default(now())
+  privileges String? @default("[]")
+  //gender, email, phone, address, date of birth, profile picture, etc.
+  
 
-model Post {
-  id        Int     @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean @default(false)
-
-  author   User @relation(fields: [authorId], references: [id])
-  authorId Int
 }
