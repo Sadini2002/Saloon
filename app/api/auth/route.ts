@@ -30,6 +30,13 @@ export async function POST(request: NextRequest) {
             { status: 401 }
         );
     }
+    if (user.status !="ACTIVE"){
+        return NextResponse.json(
+            {
+                message : "Your account is disable. Please contact the administrator."
+            }
+        )
+    }
 
     // Compare password
     const isPasswordValid = await compare(
@@ -38,6 +45,14 @@ export async function POST(request: NextRequest) {
     );
 
     if (isPasswordValid) {
+        await prisma.user.update({
+            where:{
+                id: user.id
+            },
+            data :{
+                lastLogin  : new Date()
+            }
+        })
 
         const secretText = process.env.JOSE_SECRET;
 
