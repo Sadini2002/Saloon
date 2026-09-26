@@ -4,108 +4,104 @@ import { compare } from "bcryptjs";
 import * as jose from "jose";
 
 export async function POST(request: NextRequest) {
+  try {
     const body = await request.json();
 
-    console.log("Request body:", body);
-
-    // Email validation
-    if (body.email == null) {
-        return NextResponse.json(
-            { error: "Email is required" },
-            { status: 400 }
-        );
+    // 1. Input validation
+    if (!body?.email || !body?.password) {
+      return NextResponse.json(
+        { error: "Email and password are required" },
+        { status: 400 }
+      );
     }
 
-    // Find user by email
+    // 2. Find user by email
     const user = await prisma.user.findFirst({
-        where: {
-            email: body.email,
-        },
+      where: {
+        email: body.email,
+      },
     });
 
-    // User not found
-    if (user == null) {
-        return NextResponse.json(
-            { error: "User not found" },
-            { status: 401 }
-        );
-    }
-    if (user.status !="ACTIVE"){
-        return NextResponse.json(
-            {
-                message : "Your account is disable. Please contact the administrator."
-            }
-        )
+    // 3. User check (Generic error message prevents email enumeration)
+    if (!user) {
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
-    // Compare password
-    const isPasswordValid = await compare(
-        body.password,
-        user.password
+    // 4. Check status with explicit 403 status code
+    if (user.status !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "Your account is disabled. Please contact the administrator." },
+        { status: 403 }
+      );
+    }
+
+    // 5. Compare password
+    const isPasswordValid = await compare(body.password, user.password);
+
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 }
+      );
+    }
+
+    // 6. Check environment secrets
+    const secretText = process.env.JOSE_SECRET;
+    if (!secretText) {
+      return NextResponse.json(
+        { error: "JOSE_SECRET is not configured" },
+        { status: 500 }
+      );
+    }
+
+    // 7. Update last login timestamp
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
+
+    // 8. Create JWT Token
+    const secret = new TextEncoder().encode(secretText);
+    const token = await new jose.SignJWT({
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      privileges: user.privileges,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setExpirationTime("2h")
+      .sign(secret);
+
+    // 9. Send Response with Cookie
+    const response = NextResponse.json(
+      {
+        message: "Login successful",
+        role: user.role,
+      },
+      { status: 200 }
     );
 
-    if (isPasswordValid) {
-        await prisma.user.update({
-            where:{
-                id: user.id
-            },
-            data :{
-                lastLogin  : new Date()
-            }
-        })
+    response.cookies.set({
+      name: "logintoken",
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 2,
+      path: "/",
+    });
 
-        const secretText = process.env.JOSE_SECRET;
+    return response;
 
-        if (!secretText) {
-            return NextResponse.json(
-                { error: "JOSE_SECRET is not configured" },
-                { status: 500 }
-            );
-        }
-
-        const secret = new TextEncoder().encode(secretText);
-
-        // Create JWT
-        const token = await new jose.SignJWT({
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            privileges: user.privileges,
-        })
-            .setProtectedHeader({ alg: "HS256" })
-            .setExpirationTime("2h")
-            .sign(secret);
-
-        console.log("Generated JWT token:", token);
-
-        // Create response
-        const response = NextResponse.json(
-            {
-                message: "Login successful",
-                role: user.role,
-            },
-            { status: 200 }
-        );
-
-        // Set cookie
-        response.cookies.set({
-            name: "logintoken",
-            value: token,
-            httpOnly: true,
-            secure: false,
-            sameSite: "strict",
-            maxAge: 60 * 60 * 2,
-        });
-
-        return response;
-
-    } else {
-
-        return NextResponse.json(
-            { error: "Invalid password" },
-            { status: 401 }
-        );
-
-    }
+  } catch (error) {
+    console.error("Auth Handler Error:", error);
+    return NextResponse.json(
+      { error: "Invalid request payload or server error" },
+      { status: 400 }
+    );
+  }
 }
